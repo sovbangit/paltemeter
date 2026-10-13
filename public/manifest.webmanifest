@@ -1,0 +1,12 @@
+{
+  "name": "PlateScan",
+  "short_name": "PlateScan",
+  "description": "Calories, nutrients and health risk from a food photo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f6ee",
+  "theme_color": "#2f6b4a",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
