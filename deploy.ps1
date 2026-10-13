@@ -33,7 +33,11 @@ if (-not $Project -or $Project -eq "(unset)") {
 }
 Write-Host "[+] Target GCP Project: $Project" -ForegroundColor Green
 
-# 3. Ensure required IAM permissions for Cloud Build (idempotent)
+# 3. Ensure required APIs are enabled (idempotent)
+Write-Host "[*] Verifying enabled GCP services..." -ForegroundColor Yellow
+gcloud services enable generativelanguage.googleapis.com --quiet 2>$null | Out-Null
+
+# 4. Ensure required IAM permissions for Cloud Build (idempotent)
 Write-Host "[*] Checking Cloud Build IAM permissions..." -ForegroundColor Yellow
 $ProjectNumber = (gcloud projects describe $Project --format="value(projectNumber)" 2>$null).Trim()
 if ($ProjectNumber) {

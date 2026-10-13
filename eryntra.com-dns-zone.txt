@@ -1,0 +1,19 @@
+; BIND Zone File for eryntra.com
+; Import this file into Hostinger hPanel -> Domains -> eryntra.com -> DNS / Nameservers -> Import DNS records
+$ORIGIN eryntra.com.
+$TTL 300
+
+; Google Cloud Run Apex Domain IPv4 (A Records)
+@    300    IN    A    216.239.32.21
+@    300    IN    A    216.239.34.21
+@    300    IN    A    216.239.36.21
+@    300    IN    A    216.239.38.21
+
+; Google Cloud Run Apex Domain IPv6 (AAAA Records)
+@    300    IN    AAAA    2001:4860:4802:32::15
+@    300    IN    AAAA    2001:4860:4802:34::15
+@    300    IN    AAAA    2001:4860:4802:36::15
+@    300    IN    AAAA    2001:4860:4802:38::15
+
+; Google Cloud Run Subdomain (www CNAME Record)
+www    300    IN    CNAME    ghs.googlehosted.com.

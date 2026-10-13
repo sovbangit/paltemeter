@@ -95,10 +95,14 @@ export const analyzeFood = createServerFn({ method: "POST" })
       "https://generativelanguage.googleapis.com/v1beta/openai"
     ).replace(/\/+$/, "");
 
-    const model =
+    let model =
       process.env["GEMINI_MODEL"] ||
       (data.config && data.config.model) ||
-      "gemini-2.0-flash";
+      "gemini-3.8-flash";
+
+    if (!model || model.includes("gemini-2.0-flash")) {
+      model = "gemini-3.8-flash";
+    }
 
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
