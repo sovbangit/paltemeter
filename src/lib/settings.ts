@@ -17,7 +17,11 @@ export function saveConfig(c: AiConfig | null) {
 export async function fileToDataUrl(file: File, max = 1024): Promise<string> {
   const url = URL.createObjectURL(file);
   const img = new Image();
-  await new Promise((r, j) => { img.onload = r; img.onerror = j; img.src = url; });
+  await new Promise((r, j) => {
+    img.onload = r;
+    img.onerror = j;
+    img.src = url;
+  });
   const s = Math.min(1, max / Math.max(img.width, img.height));
   const c = document.createElement("canvas");
   c.width = Math.round(img.width * s);

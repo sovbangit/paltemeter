@@ -56,7 +56,9 @@ export function InstallPrompt() {
             </p>
           ) : (
             <>
-              <p className="mt-1 text-muted-foreground">Add it to your home screen for one-tap scanning.</p>
+              <p className="mt-1 text-muted-foreground">
+                Add it to your home screen for one-tap scanning.
+              </p>
               <button
                 onClick={async () => {
                   if (!evt) return;
@@ -71,7 +73,11 @@ export function InstallPrompt() {
             </>
           )}
         </div>
-        <button onClick={close} aria-label="Close" className="rounded-full p-1 text-muted-foreground">
+        <button
+          onClick={close}
+          aria-label="Close"
+          className="rounded-full p-1 text-muted-foreground"
+        >
           <X className="h-5 w-5" />
         </button>
       </div>

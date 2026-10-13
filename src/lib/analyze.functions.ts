@@ -96,9 +96,7 @@ export const analyzeFood = createServerFn({ method: "POST" })
     ).replace(/\/+$/, "");
 
     let model =
-      process.env["GEMINI_MODEL"] ||
-      (data.config && data.config.model) ||
-      "gemini-3.8-flash";
+      process.env["GEMINI_MODEL"] || (data.config && data.config.model) || "gemini-3.8-flash";
 
     if (!model || model.includes("gemini-2.0-flash")) {
       model = "gemini-3.8-flash";
@@ -142,7 +140,10 @@ export const analyzeFood = createServerFn({ method: "POST" })
 
     // Strip markdown code fences if model wrapped response in ```json ... ```
     if (typeof content === "string") {
-      content = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+      content = content
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/```\s*$/i, "")
+        .trim();
     }
 
     return JSON.parse(content) as FoodResult;
@@ -156,8 +157,15 @@ export type FoodResult = {
   items: { name: string; portion: string; calories: number; protein_g: number }[];
   cooking_oil: string;
   totals: {
-    calories: number; protein_g: number; carbs_g: number; fat_g: number; saturated_fat_g: number;
-    fiber_g: number; sugar_g: number; sodium_mg: number; cholesterol_mg: number;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    saturated_fat_g: number;
+    fiber_g: number;
+    sugar_g: number;
+    sodium_mg: number;
+    cholesterol_mg: number;
   };
   micronutrients: { name: string; amount: string }[];
   risks: { condition: string; level: Level; reason: string }[];
