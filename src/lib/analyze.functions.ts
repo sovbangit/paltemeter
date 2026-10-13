@@ -77,93 +77,71 @@ export const analyzeFood = createServerFn({ method: "POST" })
       ? "User answers:\n" + data.answers.map((x) => `- ${x.q}: ${x.a}`).join("\n")
       : "No user answers yet.";
 
-    if (data.config && data.config.apiKey) {
-      const base = data.config.baseUrl.replace(/\/+$/, "");
-      const res = await fetch(`${base}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${data.config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: data.config.model || "gpt-4o",
-          response_format: { type: "json_schema", json_schema: { name: "food", strict: true, schema } },
-          messages: [
-            { role: "system", content: PROMPT },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: answerText + "\nReturn json." },
-                { type: "image_url", image_url: { url: data.image } },
-              ],
-            },
-          ],
-        }),
-      });
-      if (!res.ok) throw new Error(`Your AI provider returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
-      const j = await res.json();
-      return JSON.parse(j.choices[0].message.content) as FoodResult;
+    const apiKey =
+      process.env["GEMINI_API_KEY"] ||
+      process.env["GOOGLE_API_KEY"] ||
+      (data.config && data.config.apiKey) ||
+      process.env["LOVABLE_API_KEY"];
+
+    if (!apiKey) {
+      throw new Error(
+        "AI is not configured. Please set the GEMINI_API_KEY environment variable in your deployment environment.",
+      );
     }
 
-    const key = process.env['LOVABLE_API_KEY'];
-    if (!key) throw new Error("Demo AI is not configured. Add your own key in Settings.");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
+    const baseUrl = (
+      process.env["GEMINI_BASE_URL"] ||
+      (data.config && data.config.baseUrl) ||
+      "https://generativelanguage.googleapis.com/v1beta/openai"
+    ).replace(/\/+$/, "");
+
+    const model =
+      process.env["GEMINI_MODEL"] ||
+      (data.config && data.config.model) ||
+      "gemini-2.0-flash";
+
+    const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Lovable-API-Key": key,
-        "X-Lovable-AIG-SDK": "fetch",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "openai/gpt-6-astra",
-        instructions: PROMPT,
-        stream: true,
-        store: false,
-        reasoning: { effort: "low" },
-        text: { format: { type: "json_schema", name: "food", strict: true, schema } },
-        input: [
+        model,
+        response_format: {
+          type: "json_schema",
+          json_schema: { name: "food", strict: true, schema },
+        },
+        messages: [
+          { role: "system", content: PROMPT },
           {
             role: "user",
             content: [
-              { type: "input_text", text: answerText },
-              { type: "input_image", image_url: data.image },
+              { type: "text", text: answerText + "\nReturn json adhering strictly to the schema." },
+              { type: "image_url", image_url: { url: data.image } },
             ],
           },
         ],
       }),
     });
-    if (!res.ok || !res.body) {
-      const t = await res.text();
-      if (res.status === 402) throw new Error("Demo AI credits ran out. Add your own key in Settings.");
-      if (res.status === 429) throw new Error("Too many requests — please wait a moment and try again.");
-      throw new Error(`AI error ${res.status}: ${t.slice(0, 200)}`);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Gemini AI returned ${res.status}: ${errText.slice(0, 200)}`);
     }
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    let out = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        const p = line.slice(5).trim();
-        if (!p || p === "[DONE]") continue;
-        try {
-          const ev = JSON.parse(p);
-          if (ev.type === "response.output_text.delta") out += ev.delta;
-          if (ev.type === "error" || ev.type === "response.failed")
-            throw new Error(ev.error?.message ?? "AI request failed");
-        } catch (e) {
-          if (e instanceof Error && e.message !== "Unexpected end of JSON input" && !(e instanceof SyntaxError)) throw e;
-        }
-      }
+
+    const j = await res.json();
+    let content = j.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error("No response received from Gemini AI.");
     }
-    if (!out) throw new Error("The AI could not analyse this photo. Try another picture.");
-    return JSON.parse(out) as FoodResult;
+
+    // Strip markdown code fences if model wrapped response in ```json ... ```
+    if (typeof content === "string") {
+      content = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+    }
+
+    return JSON.parse(content) as FoodResult;
   });
 
 export type Level = "low" | "moderate" | "high";

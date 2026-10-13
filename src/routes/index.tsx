@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, ImageIcon, Settings, RotateCcw, Loader2, Droplet } from "lucide-react";
+import { Camera, ImageIcon, RotateCcw, Loader2, Droplet } from "lucide-react";
 import { analyzeFood, type FoodResult, type Level } from "@/lib/analyze.functions";
-import { fileToDataUrl, loadConfig } from "@/lib/settings";
+import { fileToDataUrl } from "@/lib/settings";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -38,7 +38,7 @@ function Index() {
   async function run(img: string, answers: { q: string; a: string }[] = []) {
     setLoading(true); setError("");
     try {
-      const r = await analyze({ data: { image: img, answers, config: loadConfig() } });
+      const r = await analyze({ data: { image: img, answers } });
       setResult(r); setPicks({});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -60,7 +60,6 @@ function Index() {
 
       <header className="flex items-center justify-between px-5 pt-6">
         <h1 className="text-xl font-semibold">Plate<span className="text-primary">Scan</span></h1>
-        <Link to="/settings" aria-label="Settings" className="rounded-full bg-card p-2.5 shadow-sm"><Settings className="h-5 w-5" /></Link>
       </header>
 
       {!image && (

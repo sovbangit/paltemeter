@@ -1,0 +1,16 @@
+node_modules
+.git
+.github
+.gitignore
+.output
+dist
+dist-ssr
+.vinxi
+.tanstack
+.nitro
+*.local
+.dev.vars
+.wrangler
+README.md
+AGENTS.md
+deploy.ps1
