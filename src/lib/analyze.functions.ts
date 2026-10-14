@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const Input = z.object({
+export const Input = z.object({
   image: z.string().startsWith("data:image/"),
   answers: z.array(z.object({ q: z.string(), a: z.string() })).default([]),
   config: z

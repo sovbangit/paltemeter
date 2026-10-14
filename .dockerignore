@@ -10,6 +10,7 @@ dist-ssr
 .nitro
 *.local
 .dev.vars
+.env*
 .wrangler
 README.md
 AGENTS.md

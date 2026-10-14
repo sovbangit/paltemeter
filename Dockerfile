@@ -10,6 +10,10 @@ RUN bun install
 # Copy application source code
 COPY . .
 
+# OAuth client ID is public (identifies the app, not a secret); baked into the client bundle at build time.
+# The client secret is never in the image — it is provided at runtime via Cloud Run env vars.
+ENV VITE_GOOGLE_CLIENT_ID=131807938624-anh06ij2jpje5e93dk4g4rben0i736p4.apps.googleusercontent.com
+
 # Set Nitro preset to node-server so it produces a standalone Node.js server
 ENV NITRO_PRESET=node-server
 RUN bun run build

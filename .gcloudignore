@@ -1,0 +1,22 @@
+# Files not uploaded for Cloud Run source deploys
+.git
+.github
+node_modules
+.output
+dist
+dist-ssr
+.vinxi
+.tanstack
+.nitro
+.wrangler
+*.local
+.dev.vars
+
+# Secrets never leave the machine; runtime values are set via --set-env-vars
+.env*
+
+# Not needed in the container build
+README.md
+AGENTS.md
+deploy.ps1
+eryntra.com-dns-zone.txt

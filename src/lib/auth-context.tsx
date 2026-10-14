@@ -11,13 +11,20 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: () => Promise<void>;
+  completeSignIn: (user: User) => void;
   signOut: () => void;
+  /** AI scans used in the current login session (resets on sign-in). */
+  scansUsed: number;
+  /** Records one AI scan against the current session's allowance. */
+  recordScan: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
+const SCAN_COUNT_KEY = "scan_count";
+export const MAX_SCANS_PER_SESSION = 10;
 
 // Secure token storage with encryption
 async function encryptToken(token: string): Promise<string> {
@@ -49,6 +56,7 @@ async function decryptToken(encryptedToken: string): Promise<string | null> {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [scansUsed, setScansUsed] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,14 +70,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionStorage.removeItem(TOKEN_KEY);
       }
     }
+    const storedCount = Number(sessionStorage.getItem(SCAN_COUNT_KEY) || 0);
+    setScansUsed(Number.isFinite(storedCount) && storedCount > 0 ? storedCount : 0);
     setLoading(false);
   }, []);
 
   const signIn = useCallback(async () => {
     setLoading(true);
     try {
-      // Initialize Google OAuth
-      const clientId = "client id 1";
+      // Initialize Google OAuth (client ID is public; secret stays server-side)
+      const clientId = import.meta.env["VITE_GOOGLE_CLIENT_ID"] as string | undefined;
+      if (!clientId) {
+        throw new Error(
+          "Google sign-in is not configured. Set VITE_GOOGLE_CLIENT_ID in your environment.",
+        );
+      }
       const redirectUri = `${window.location.origin}/auth/callback`;
       const scope = "openid email profile";
 
@@ -97,15 +112,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const completeSignIn = useCallback((u: User) => {
+    sessionStorage.setItem(USER_KEY, JSON.stringify(u));
+    sessionStorage.setItem(SCAN_COUNT_KEY, "0");
+    setUser(u);
+    setScansUsed(0);
+  }, []);
+
   const signOut = useCallback(() => {
     setUser(null);
+    setScansUsed(0);
     sessionStorage.removeItem(USER_KEY);
     sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(SCAN_COUNT_KEY);
     sessionStorage.removeItem("oauth_state");
   }, []);
 
+  const recordScan = useCallback(() => {
+    const next = (Number(sessionStorage.getItem(SCAN_COUNT_KEY)) || 0) + 1;
+    sessionStorage.setItem(SCAN_COUNT_KEY, String(next));
+    setScansUsed(next);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ user, loading, signIn, completeSignIn, signOut, scansUsed, recordScan }}
+    >
       {children}
     </AuthContext.Provider>
   );

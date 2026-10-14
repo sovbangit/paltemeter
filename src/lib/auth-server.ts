@@ -1,7 +1,15 @@
-import { createMiddleware } from "@tanstack/react-start";
+import { createMiddleware, createServerFn } from "@tanstack/react-start";
 
-const GOOGLE_CLIENT_ID = "client id 1";
-const GOOGLE_CLIENT_SECRET = "secret1";
+function getGoogleCredentials(): { clientId: string; clientSecret: string } {
+  const clientId = process.env["GOOGLE_CLIENT_ID"];
+  const clientSecret = process.env["GOOGLE_CLIENT_SECRET"];
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the server.",
+    );
+  }
+  return { clientId, clientSecret };
+}
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -83,7 +91,8 @@ async function verifyGoogleToken(
     const payload = JSON.parse(atob((payloadB64 as string).replace(/-/g, "+").replace(/_/g, "/")));
 
     // Validate the token claims
-    if (payload.aud !== GOOGLE_CLIENT_ID) return null;
+    const clientId = process.env["GOOGLE_CLIENT_ID"];
+    if (!clientId || payload.aud !== clientId) return null;
     if (payload.iss !== "https://accounts.google.com" && payload.iss !== "accounts.google.com")
       return null;
     if (payload.exp < Date.now() / 1000) return null;
@@ -99,39 +108,41 @@ export const authMiddleware = createMiddleware().server(async ({ next }) => {
   return next();
 });
 
-export async function exchangeCodeForToken(
-  code: string,
-  redirectUri: string,
-): Promise<GoogleTokenResponse> {
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: GOOGLE_CLIENT_ID,
-      client_secret: GOOGLE_CLIENT_SECRET,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
+export const exchangeCodeForToken = createServerFn({ method: "POST" })
+  .validator((d: { code: string; redirectUri: string }) => d)
+  .handler(async ({ data }): Promise<GoogleTokenResponse> => {
+    const { clientId, clientSecret } = getGoogleCredentials();
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code: data.code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: data.redirectUri,
+        grant_type: "authorization_code",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to exchange code for token");
+    }
+
+    return response.json();
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to exchange code for token");
-  }
+export const getUserInfo = createServerFn({ method: "POST" })
+  .validator((d: { accessToken: string }) => d)
+  .handler(async ({ data }): Promise<GoogleUserInfo> => {
+    const response = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: { Authorization: `Bearer ${data.accessToken}` },
+    });
 
-  return response.json();
-}
+    if (!response.ok) {
+      throw new Error("Failed to fetch user info");
+    }
 
-export async function getUserInfo(accessToken: string): Promise<GoogleUserInfo> {
-  const response = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    return response.json();
   });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch user info");
-  }
-
-  return response.json();
-}
 
 export { verifyGoogleToken };

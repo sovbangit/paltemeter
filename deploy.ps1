@@ -60,7 +60,16 @@ if ($ProjectNumber) {
     }
 }
 
-# 4. Deploy to Cloud Run with Free-Tier Guardrails
+# 5. Run unit tests before deploying (abort on failure)
+Write-Host "[*] Running unit tests..." -ForegroundColor Yellow
+npm test
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[!] Unit tests failed. Deployment aborted." -ForegroundColor Red
+    exit 1
+}
+Write-Host "[+] All tests passed." -ForegroundColor Green
+
+# 6. Deploy to Cloud Run with Free-Tier Guardrails
 Write-Host "[*] Building container and deploying to Cloud Run ($Region)..." -ForegroundColor Yellow
 Write-Host "    - Scale-to-zero: Enabled (min-instances: 0)" -ForegroundColor Gray
 Write-Host "    - Cost protection: Max instances capped at 2" -ForegroundColor Gray
@@ -79,10 +88,40 @@ $deployArgs = @(
     "--quiet"
 )
 
-# Optional: Set Gemini API key if provided
-$keyToSet = if ($GeminiApiKey) { $GeminiApiKey } elseif ($ApiKey) { $ApiKey } else { $env:GEMINI_API_KEY }
-if ($keyToSet) {
-    $deployArgs += @("--set-env-vars", "GEMINI_API_KEY=$keyToSet")
+# Load local .env values (never printed) for runtime env vars
+$envMap = @{}
+$envPath = Join-Path $PSScriptRoot ".env"
+if (Test-Path $envPath) {
+    Get-Content $envPath | ForEach-Object {
+        $t = $_.Trim()
+        if ($t -and -not $t.StartsWith("#") -and $t.Contains("=")) {
+            $k, $v = $t.Split("=", 2)
+            $envMap[$k.Trim()] = $v.Trim()
+        }
+    }
+}
+
+# Required: Gemini API key (param > env var > local .env)
+$geminiKey = if ($GeminiApiKey) { $GeminiApiKey } elseif ($ApiKey) { $ApiKey } elseif ($env:GEMINI_API_KEY) { $env:GEMINI_API_KEY } elseif ($envMap["GEMINI_API_KEY"]) { $envMap["GEMINI_API_KEY"] } else { "" }
+
+# Google OAuth server credentials (secret must exist server-side; the client ID is public)
+$googleClientId = $envMap["GOOGLE_CLIENT_ID"]
+if (-not $googleClientId) { $googleClientId = $envMap["VITE_GOOGLE_CLIENT_ID"] }
+$googleClientSecret = $envMap["GOOGLE_CLIENT_SECRET"]
+
+# NOTE: --set-env-vars REPLACES all env vars on the service, so set every required var together.
+$envVars = @()
+if ($geminiKey) { $envVars += "GEMINI_API_KEY=$geminiKey" }
+if ($googleClientId) { $envVars += "GOOGLE_CLIENT_ID=$googleClientId" }
+if ($googleClientSecret) { $envVars += "GOOGLE_CLIENT_SECRET=$googleClientSecret" }
+if ($envVars.Count -gt 0) {
+    Write-Host "[*] Setting runtime env vars:" -ForegroundColor Yellow
+    Write-Host "    - GEMINI_API_KEY=$(if ($geminiKey) { '(set)' } else { '(missing)' })" -ForegroundColor Gray
+    Write-Host "    - GOOGLE_CLIENT_ID=$(if ($googleClientId) { '(set)' } else { '(missing)' })" -ForegroundColor Gray
+    Write-Host "    - GOOGLE_CLIENT_SECRET=$(if ($googleClientSecret) { '(set)' } else { '(missing)' })" -ForegroundColor Gray
+    $deployArgs += @("--set-env-vars", ($envVars -join ","))
+} else {
+    Write-Host "[!] Warning: no env vars found (checked params, environment, and .env)" -ForegroundColor Red
 }
 
 & gcloud @deployArgs
@@ -93,7 +132,7 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-# 5. Output live deployment URL
+# 7. Output live deployment URL
 $ServiceUrl = (gcloud run services describe $ServiceName --region $Region --format="value(status.url)" 2>$null).Trim()
 
 Write-Host ""

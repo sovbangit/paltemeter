@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { exchangeCodeForToken, getUserInfo } from "@/lib/auth-server";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, type User } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/auth/callback")({
   component: AuthCallback,
@@ -9,10 +10,20 @@ export const Route = createFileRoute("/auth/callback")({
 
 function AuthCallback() {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { user, loading, completeSignIn } = useAuth();
+  const exchangeCode = useServerFn(exchangeCodeForToken);
+  const fetchUserInfo = useServerFn(getUserInfo);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (user && !loading) {
+      navigate({ to: "/" });
+    }
+  }, [user, loading, navigate]);
+
+  useEffect(() => {
+    if (user) return;
+
     async function handleCallback() {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
@@ -28,20 +39,20 @@ function AuthCallback() {
 
       try {
         const redirectUri = `${window.location.origin}/auth/callback`;
-        const tokenResponse = await exchangeCodeForToken(code, redirectUri);
-        const userInfo = await getUserInfo(tokenResponse.access_token);
+        const tokenResponse = await exchangeCode({ data: { code, redirectUri } });
+        const userInfo = await fetchUserInfo({ data: { accessToken: tokenResponse.access_token } });
 
         // Store user info securely
-        const user = {
+        const profile: User = {
           id: userInfo.id,
           email: userInfo.email,
           name: userInfo.name,
-          picture: userInfo.picture,
+          ...(userInfo.picture ? { picture: userInfo.picture } : {}),
         };
 
-        sessionStorage.setItem("auth_user", JSON.stringify(user));
         sessionStorage.setItem("auth_token", tokenResponse.id_token);
         sessionStorage.removeItem("oauth_state");
+        completeSignIn(profile);
 
         navigate({ to: "/" });
       } catch (err) {
@@ -52,7 +63,7 @@ function AuthCallback() {
     }
 
     handleCallback();
-  }, [navigate]);
+  }, [navigate, user, exchangeCode, fetchUserInfo, completeSignIn]);
 
   if (error) {
     return (
